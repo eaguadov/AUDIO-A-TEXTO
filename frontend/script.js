@@ -174,17 +174,32 @@ function closeModal() {
 async function checkTokenStatus() {
     try {
         const response = await fetch(`${API_BASE_URL}/config`);
+        if (!response.ok) throw new Error("Backend not ready");
+
         const data = await response.json();
         hasValidToken = data.has_token;
+        console.log('🔑 Token status:', hasValidToken);
 
-        if (!hasValidToken && diarizationCheckbox.checked) {
-            diarizationCheckbox.checked = false; // Uncheck if no token actually exists
+        if (hasValidToken) {
+            // Restore saved state only if token is valid
+            const savedDiarization = localStorage.getItem(PREFS_KEY)
+                ? JSON.parse(localStorage.getItem(PREFS_KEY)).diarization
+                : false;
+
+            if (savedDiarization) {
+                diarizationCheckbox.checked = true;
+                speakersInputContainer.style.display = 'flex';
+            }
+        } else {
+            diarizationCheckbox.checked = false;
             speakersInputContainer.style.display = 'none';
-        } else if (hasValidToken && diarizationCheckbox.checked) {
-            speakersInputContainer.style.display = 'flex';
         }
+
     } catch (e) {
-        console.error("Could not check token status", e);
+        console.warn("Backend not ready yet, retrying in 2s...", e);
+        hasValidToken = false;
+        // Retry
+        setTimeout(checkTokenStatus, 2000);
     }
 }
 

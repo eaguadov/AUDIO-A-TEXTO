@@ -2,7 +2,23 @@
 
 Todos los cambios notables en este proyecto se documentarán en este archivo.
 
-## [1.1.0] - 2026-01-30
+## [2.0.0] - 2026-01-30
+
+### ⭐ Principales Mejoras
+- **Estabilidad Total en Lotes**: Implementado sistema de "Semáforo" (Lock) que procesa los archivos uno por uno. Esto elimina los errores de `Torch Runtime Error` (tensor size mismatch) al subir muchos archivos a la vez.
+- **Persistencia de Token**: Arreglado el problema donde la aplicación olvidaba el Token de Hugging Face al reiniciar. Ahora se guarda de forma segura en `config.json` y se carga con logs de confirmación.
+- **Interfaz UI Pulida**: Solucionado el error visual donde la ventana de configuración aparecía "rota" al final de la página. Ahora es un modal oculto correctamente.
+
+### 🚀 Añadido
+- **Sufijo Automático**: Todos los archivos generados ahora terminan en `_Transcrito.txt` para facilitar su identificación.
+- **Launcher Optimizado**: `start_app.bat` ahora abre el navegador automáticamente tras verificar que los servidores están listos.
+- **Guía de Instalación**: Añadido `INSTALL_GUIDE.md` para facilitar la migración a otros equipos.
+
+### 🐛 Corregido
+- Race conditions en el frontend al comprobar el estado del token.
+- Errores 404 en el bucle de estado tras reinicios del servidor (ahora el frontend maneja mejor estas desconexiones).
+
+---
 
 ### 🚀 Añadido
 - **Diarización de Hablantes**: Soporte añadido para identificar hablantes usando `pyannote.audio`.

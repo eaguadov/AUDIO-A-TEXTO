@@ -71,42 +71,51 @@ def allowed_file(filename):
     """Verifica si el archivo tiene una extensión permitida"""
     return Path(filename).suffix.lower() in ALLOWED_EXTENSIONS
 
+# Global Lock for processing (Sequencing)
+processing_lock = threading.Lock()
+
 def process_audio_task(task_id, audio_path, filename, model='small', timestamps=False, diarization=False, num_speakers=None):
-    """Función que se ejecuta en un hilo separado para procesar el audio"""
+    """Función que se ejecuta en un hilo separado para procesar el audio SECUENCIALMENTE"""
     try:
-       # Actualizar estado
+        # Actualizar estado inicial (En cola, pero 'processing' para la UI)
         tasks[task_id]['status'] = 'processing'
-        tasks[task_id]['progress'] = 10
+        tasks[task_id]['progress'] = 5
         
-        logger.info(f"THREAD START: Procesando {filename} - Modelo: {model}, Timestamps: {timestamps}, Diarization: {diarization}")
+        logger.info(f"THREAD START: {filename} esperando turno... (Lock)")
         
-        # Cambiar modelo de Whisper si es necesario
-        old_model = whisper_service.model_name
-        if old_model != model:
-            whisper_service.model_name = model
-            whisper_service.model = None  # Forzar recarga del modelo
-            logger.info(f"MODEL CHANGE: {old_model} -> {model}")
-        
-        # Cargar modelo de Whisper si no está cargado
-        tasks[task_id]['progress'] = 20
-        whisper_service.load_model()
-        logger.info(f"MODEL READY: {whisper_service.model_name}")
-        
-        # Procesar audio (dividir y transcribir)
-        tasks[task_id]['progress'] = 30
-        logger.info(f"PROCESSING START: Timestamps={timestamps}, Diarization={diarization}")
-        
-        result = audio_processor.process_audio(audio_path, TRANSCRIPTION_DIR, original_filename=filename, include_timestamps=timestamps, perform_diarization=diarization, num_speakers=num_speakers)
-        
-        # Actualizar tarea con resultados
-        tasks[task_id]['status'] = 'completed'
-        tasks[task_id]['progress'] = 100
-        tasks[task_id]['result'] = result
-        tasks[task_id]['output_files'] = [os.path.basename(f) for f in result['output_files']]
-        tasks[task_id]['original_file'] = filename
-        
-        logger.info(f"TASK COMPLETED: {filename}")
-        
+        # --- AQUÍ ESTÁ LA MAGIA: Esperar turno (Semáforo) ---
+        with processing_lock:
+            logger.info(f"LOCK ACQUIRED: Iniciando procesamiento real de {filename}")
+            tasks[task_id]['progress'] = 10
+            
+            # Cambiar modelo de Whisper si es necesario
+            old_model = whisper_service.model_name
+            if old_model != model:
+                whisper_service.model_name = model
+                whisper_service.model = None  # Forzar recarga del modelo
+                logger.info(f"MODEL CHANGE: {old_model} -> {model}")
+            
+            # Cargar modelo de Whisper si no está cargado
+            tasks[task_id]['progress'] = 20
+            whisper_service.load_model()
+            logger.info(f"MODEL READY: {whisper_service.model_name}")
+            
+            # Procesar audio (dividir y transcribir)
+            tasks[task_id]['progress'] = 30
+            logger.info(f"PROCESSING START: Timestamps={timestamps}, Diarization={diarization}")
+            
+            result = audio_processor.process_audio(audio_path, TRANSCRIPTION_DIR, original_filename=filename, include_timestamps=timestamps, perform_diarization=diarization, num_speakers=num_speakers)
+            
+            # Actualizar tarea con resultados
+            tasks[task_id]['status'] = 'completed'
+            tasks[task_id]['progress'] = 100
+            tasks[task_id]['result'] = result
+            tasks[task_id]['output_files'] = [os.path.basename(f) for f in result['output_files']]
+            tasks[task_id]['original_file'] = filename
+            
+            logger.info(f"TASK COMPLETED: {filename}")
+            logger.info(f"LOCK RELEASED: Fin de {filename}")
+            
     except Exception as e:
         logger.error(f"TASK ERROR in {filename}: {e}", exc_info=True)
         tasks[task_id]['status'] = 'error'

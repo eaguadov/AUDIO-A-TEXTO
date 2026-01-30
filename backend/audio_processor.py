@@ -195,9 +195,9 @@ class AudioProcessor:
                 
                 # Guardar transcripción del segmento
                 if len(segment_paths) > 1:
-                    segment_txt_name = f"{audio_filename}_parte{i+1}.txt"
+                    segment_txt_name = f"{audio_filename}_Transcrito_parte{i+1}.txt"
                 else:
-                    segment_txt_name = f"{audio_filename}.txt"
+                    segment_txt_name = f"{audio_filename}_Transcrito.txt"
                 
                 segment_txt_path = os.path.join(output_dir, segment_txt_name)
                 
@@ -213,7 +213,7 @@ class AudioProcessor:
         
         # Si hubo múltiples segmentos, crear archivo consolidado
         if len(segment_paths) > 1:
-            consolidated_txt_name = f"{audio_filename}_completo.txt"
+            consolidated_txt_name = f"{audio_filename}_Transcrito_completo.txt"
             consolidated_txt_path = os.path.join(output_dir, consolidated_txt_name)
             
             with open(consolidated_txt_path, 'w', encoding='utf-8') as f:

@@ -34,6 +34,10 @@ transcriptions/
 test_*.py
 check_*.py
 
+# Secrets
+config.json
+backend/config.json
+
 # OS
 .DS_Store
 Thumbs.db

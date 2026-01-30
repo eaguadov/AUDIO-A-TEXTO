@@ -2,7 +2,9 @@ import json
 import os
 import logging
 
-CONFIG_FILE = 'config.json'
+# Resolver ruta absoluta correcta
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CONFIG_FILE = os.path.join(BASE_DIR, 'config.json')
 logger = logging.getLogger(__name__)
 
 class ConfigManager:
@@ -17,14 +19,17 @@ class ConfigManager:
 
     def load_config(self):
         """Carga la configuración desde el archivo JSON"""
+        logger.info(f"Cargando configuración desde: {CONFIG_FILE}")
         if os.path.exists(CONFIG_FILE):
             try:
                 with open(CONFIG_FILE, 'r') as f:
                     self._config = json.load(f)
+                logger.info(f"Configuración cargada. Keys: {list(self._config.keys())}")
             except Exception as e:
                 logger.error(f"Error cargando config: {e}")
                 self._config = {}
         else:
+            logger.warning(f"No se encontró el archivo de configuración en: {CONFIG_FILE}")
             self._config = {}
 
     def save_config(self):
