@@ -3,11 +3,19 @@ const API_BASE_URL = 'http://127.0.0.1:5000';
 const POLL_INTERVAL = 2000; // Poll every 2 seconds
 
 // DOM Elements
+// DOM Elements
 const uploadZone = document.getElementById('uploadZone');
 const fileInput = document.getElementById('fileInput');
 const languageSelect = document.getElementById('language');
 const modelSelect = document.getElementById('model');
 const timestampsCheckbox = document.getElementById('timestamps');
+const diarizationCheckbox = document.getElementById('diarization'); // NEW
+const settingsBtn = document.getElementById('settingsBtn'); // NEW
+const configModal = document.getElementById('configModal'); // NEW
+const hfTokenInput = document.getElementById('hfToken'); // NEW
+const saveConfigBtn = document.getElementById('saveConfig'); // NEW
+const cancelConfigBtn = document.getElementById('cancelConfig'); // NEW
+const closeModalBtn = document.querySelector('.close-modal'); // NEW
 const timeEstimate = document.getElementById('timeEstimate');
 const timeEstimateText = document.getElementById('timeEstimateText');
 const filesQueue = document.getElementById('filesQueue');
@@ -18,6 +26,7 @@ const resultsList = document.getElementById('resultsList');
 // State
 const activeTasks = new Map();
 const completedTasks = new Set();
+let hasValidToken = false;
 
 // Preferences key
 const PREFS_KEY = 'audioToTextPrefs';
@@ -31,33 +40,13 @@ const MODEL_SPEEDS = {
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     loadPreferences();
+    checkTokenStatus(); // Check if backend has token
     setupEventListeners();
 });
 
 function setupEventListeners() {
-    // Check if all required elements exist
-    if (!uploadZone) {
-        console.error('Error: uploadZone element not found');
-        return;
-    }
-    if (!fileInput) {
-        console.error('Error: fileInput element not found');
-        return;
-    }
-    if (!languageSelect) {
-        console.error('Error: languageSelect element not found');
-        return;
-    }
-    if (!modelSelect) {
-        console.error('Error: modelSelect element not found');
-        return;
-    }
-    if (!timestampsCheckbox) {
-        console.error('Error: timestampsCheckbox element not found');
-        return;
-    }
-
-    console.log('✅ All DOM elements loaded successfully');
+    // Check if critical elements exist
+    if (!uploadZone || !fileInput) return;
 
     // Click to upload
     uploadZone.addEventListener('click', () => {
@@ -102,6 +91,101 @@ function setupEventListeners() {
     timestampsCheckbox.addEventListener('change', () => {
         savePreferences();
     });
+
+    // Diarization change
+    diarizationCheckbox.addEventListener('change', () => {
+        const isChecked = diarizationCheckbox.checked;
+
+        // Toggle speakers input visibility
+        if (isChecked) {
+            speakersInputContainer.style.display = 'flex';
+        } else {
+            speakersInputContainer.style.display = 'none';
+        }
+
+        if (isChecked && !hasValidToken) {
+            // If checking box but no token, open modal
+            openModal();
+            diarizationCheckbox.checked = false; // Cancel check until token saved
+            speakersInputContainer.style.display = 'none'; // Hide back
+        } else {
+            savePreferences();
+        }
+    });
+
+    // Settings Modal interactions
+    settingsBtn.addEventListener('click', openModal);
+    closeModalBtn.addEventListener('click', closeModal);
+    cancelConfigBtn.addEventListener('click', closeModal);
+
+    // Close modal if clicking outside
+    window.addEventListener('click', (e) => {
+        if (e.target === configModal) {
+            closeModal();
+        }
+    });
+
+    // Save Token
+    saveConfigBtn.addEventListener('click', async () => {
+        const token = hfTokenInput.value.trim();
+        if (!token) return;
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/config`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ hf_token: token })
+            });
+
+            if (response.ok) {
+                hasValidToken = true;
+                diarizationCheckbox.disabled = false;
+                diarizationCheckbox.checked = true; // Auto-enable if user was trying to enable it
+                speakersInputContainer.style.display = 'flex'; // Show speakers input
+                savePreferences();
+                closeModal();
+                alert('Token guardado correctamente ✅');
+            } else {
+                alert('Error guardando token ❌');
+            }
+        } catch (error) {
+            console.error('Error config:', error);
+            alert('Error de conexión');
+        }
+    });
+}
+
+function openModal() {
+    configModal.style.display = 'block';
+    // Fetch current token status/preview
+    fetch(`${API_BASE_URL}/config`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.token_masked) {
+                hfTokenInput.placeholder = `Actual: ${data.token_masked}`;
+            }
+        });
+}
+
+function closeModal() {
+    configModal.style.display = 'none';
+}
+
+async function checkTokenStatus() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/config`);
+        const data = await response.json();
+        hasValidToken = data.has_token;
+
+        if (!hasValidToken && diarizationCheckbox.checked) {
+            diarizationCheckbox.checked = false; // Uncheck if no token actually exists
+            speakersInputContainer.style.display = 'none';
+        } else if (hasValidToken && diarizationCheckbox.checked) {
+            speakersInputContainer.style.display = 'flex';
+        }
+    } catch (e) {
+        console.error("Could not check token status", e);
+    }
 }
 
 // Preferences Management
@@ -109,7 +193,8 @@ function savePreferences() {
     const prefs = {
         language: languageSelect.value,
         model: modelSelect.value,
-        timestamps: timestampsCheckbox.checked
+        timestamps: timestampsCheckbox.checked,
+        diarization: diarizationCheckbox.checked
     };
     localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
 }
@@ -122,6 +207,10 @@ function loadPreferences() {
             if (prefs.language) languageSelect.value = prefs.language;
             if (prefs.model) modelSelect.value = prefs.model;
             if (typeof prefs.timestamps === 'boolean') timestampsCheckbox.checked = prefs.timestamps;
+            if (typeof prefs.diarization === 'boolean') {
+                diarizationCheckbox.checked = prefs.diarization;
+                if (prefs.diarization) speakersInputContainer.style.display = 'flex';
+            }
         }
     } catch (error) {
         console.error('Error loading preferences:', error);
@@ -202,10 +291,19 @@ async function handleFiles(files) {
     // Add configuration
     formData.append('model', modelSelect.value);
     formData.append('timestamps', timestampsCheckbox.checked ? 'true' : 'false');
+    formData.append('diarization', diarizationCheckbox.checked ? 'true' : 'false');
+
+    // Add number of speakers
+    const numSpeakers = document.getElementById('numSpeakers').value;
+    if (numSpeakers && diarizationCheckbox.checked) {
+        formData.append('speakers', numSpeakers);
+    }
 
     console.log('📤 Enviando configuración:', {
         model: modelSelect.value,
         timestamps: timestampsCheckbox.checked ? 'true' : 'false',
+        diarization: diarizationCheckbox.checked ? 'true' : 'false',
+        speakers: numSpeakers,
         numFiles: filesArray.length
     });
 

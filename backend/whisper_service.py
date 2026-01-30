@@ -69,7 +69,8 @@ class WhisperService:
             result = self.model.transcribe(
                 audio_path, 
                 language=self.current_language if self.current_language != "auto" else None,
-                verbose=False # Importante para evitar spam en consola pero obtener resultado estructurado
+                verbose=False, # Importante para evitar spam en consola pero obtener resultado estructurado
+                word_timestamps=include_timestamps # Precisión a nivel de palabra para mejorar diarización
             )
             
             logger.info(f"Whisper result obtained. Keys: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}")

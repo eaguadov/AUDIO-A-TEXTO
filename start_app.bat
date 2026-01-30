@@ -13,6 +13,12 @@ REM Obtener la ruta del directorio del script
 set "SCRIPT_DIR=%~dp0"
 cd /d "%SCRIPT_DIR%"
 
+echo [0/3] Limpiando procesos antiguos...
+taskkill /F /IM python.exe /T 2>nul
+taskkill /F /IM "Audio a Texto - Backend" 2>nul
+taskkill /F /IM "Audio a Texto - Frontend" 2>nul
+timeout /t 1 /nobreak >nul
+
 REM Verificar que Python está instalado
 python --version >nul 2>&1
 if errorlevel 1 (

@@ -42,6 +42,8 @@ logger = logging.getLogger(__name__)
 try:
     from whisper_service import whisper_service
     from audio_processor import AudioProcessor
+    from diarization_service import diarization_service
+    from config import config_manager
 except ImportError as e:
     logger.error(f"Error importando servicios: {e}")
     raise
@@ -69,14 +71,14 @@ def allowed_file(filename):
     """Verifica si el archivo tiene una extensión permitida"""
     return Path(filename).suffix.lower() in ALLOWED_EXTENSIONS
 
-def process_audio_task(task_id, audio_path, filename, model='small', timestamps=False):
+def process_audio_task(task_id, audio_path, filename, model='small', timestamps=False, diarization=False, num_speakers=None):
     """Función que se ejecuta en un hilo separado para procesar el audio"""
     try:
        # Actualizar estado
         tasks[task_id]['status'] = 'processing'
         tasks[task_id]['progress'] = 10
         
-        logger.info(f"THREAD START: Procesando {filename} - Modelo: {model}, Timestamps: {timestamps}")
+        logger.info(f"THREAD START: Procesando {filename} - Modelo: {model}, Timestamps: {timestamps}, Diarization: {diarization}")
         
         # Cambiar modelo de Whisper si es necesario
         old_model = whisper_service.model_name
@@ -92,9 +94,9 @@ def process_audio_task(task_id, audio_path, filename, model='small', timestamps=
         
         # Procesar audio (dividir y transcribir)
         tasks[task_id]['progress'] = 30
-        logger.info(f"PROCESSING START: Timestamps enabled = {timestamps}")
+        logger.info(f"PROCESSING START: Timestamps={timestamps}, Diarization={diarization}")
         
-        result = audio_processor.process_audio(audio_path, TRANSCRIPTION_DIR, original_filename=filename, include_timestamps=timestamps)
+        result = audio_processor.process_audio(audio_path, TRANSCRIPTION_DIR, original_filename=filename, include_timestamps=timestamps, perform_diarization=diarization, num_speakers=num_speakers)
         
         # Actualizar tarea con resultados
         tasks[task_id]['status'] = 'completed'
@@ -138,9 +140,23 @@ def upload_file():
             timestamps = timestamps_value
         else:
             timestamps = str(timestamps_value).lower() in ['true', '1', 'yes']
+            
+        # Parse diarization
+        diarization_value = request.form.get('diarization', 'false')
+        if isinstance(diarization_value, bool):
+            diarization = diarization_value
+        else:
+            diarization = str(diarization_value).lower() in ['true', '1', 'yes']
+        
+        # Parse num_speakers
+        num_speakers = request.form.get('speakers', '')
+        if num_speakers and num_speakers.strip().isdigit():
+            num_speakers = int(num_speakers)
+        else:
+            num_speakers = None
         
         # LOG CRITICO
-        logger.info(f"UPLOAD REQUEST: Files={len(files)}, Model={model}, Timestamps={timestamps} (Raw: {timestamps_value})")
+        logger.info(f"UPLOAD REQUEST: Files={len(files)}, Model={model}, Timestamps={timestamps}, Diarization={diarization}, Speakers={num_speakers}")
         
         task_ids = []
         
@@ -168,7 +184,7 @@ def upload_file():
                 # Iniciar procesamiento en hilo separado
                 thread = threading.Thread(
                     target=process_audio_task,
-                    args=(task_id, filepath, filename, model, timestamps)
+                    args=(task_id, filepath, filename, model, timestamps, diarization, num_speakers)
                 )
                 thread.start()
                 
@@ -245,9 +261,31 @@ def health():
         'model_loaded': whisper_service.model is not None
     })
 
+@app.route('/config', methods=['POST'])
+def save_config():
+    """Endpoint para guardar configuración (Token HF)"""
+    try:
+        data = request.get_json()
+        token = data.get('hf_token')
+        if token:
+            config_manager.set_hf_token(token)
+            return jsonify({'message': 'Token guardado correctamente'}), 200
+        return jsonify({'error': 'Token no proporcionado'}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/config', methods=['GET'])
+def get_config():
+    """Endpoint para obtener estado de la configuración"""
+    token = config_manager.get_hf_token()
+    return jsonify({
+        'has_token': bool(token),
+        'token_masked': f"{token[:4]}...{token[-4:]}" if token else None
+    })
+
 if __name__ == '__main__':
     logger.info("=" * 70)
-    logger.info("SERVER STARTING - VERSION 2.1-clean-logs")
+    logger.info("SERVER STARTING - VERSION 2.2-diarization")
     logger.info("=" * 70)
     logger.info(f"Uploads Dir: {os.path.abspath(UPLOAD_DIR)}")
     logger.info(f"Transcriptions Dir: {os.path.abspath(TRANSCRIPTION_DIR)}")

@@ -619,3 +619,43 @@ h1 {
         justify-content: center;
     }
 }
+
+/* Diarization Controls Layout */
+.diarization-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.speakers-input-container {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(102, 126, 234, 0.2);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    animation: fadeIn 0.3s ease;
+}
+
+.speakers-input-container label {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.speakers-input-container input {
+    background: rgba(15, 15, 35, 0.5);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-primary);
+    padding: 0.5rem;
+    width: 80px;
+    font-family: inherit;
+    text-align: center;
+}
+
+.speakers-input-container input:focus {
+    outline: none;
+    border-color: #667eea;
+}

@@ -27,6 +27,12 @@ wheels/
 backend/uploads/
 backend/transcriptions/
 backend/temp/
+uploads/
+transcriptions/
+
+# Test scripts
+test_*.py
+check_*.py
 
 # OS
 .DS_Store
